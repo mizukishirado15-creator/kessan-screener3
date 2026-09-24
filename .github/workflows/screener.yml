@@ -1,0 +1,47 @@
+name: screener (毎朝スクリーニング)
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "30 22 * * 0-4"   # 平日 朝7:30 (日本時間)
+
+concurrency:
+  group: jquants
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      JQUANTS_RATE_PER_MIN: ${{ vars.JQUANTS_RATE_PER_MIN }}
+      DATA_DELAY_WEEKS: ${{ vars.DATA_DELAY_WEEKS }}
+      TZ: Asia/Tokyo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: キャッシュ復元
+        uses: actions/cache/restore@v4
+        with:
+          path: data/cache
+          key: jq-cache-${{ github.run_id }}
+          restore-keys: jq-cache-
+      - name: スクリーニング
+        run: python src/screener.py
+      - name: キャッシュ保存 (途中で止まっても取得済み分は残す)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/cache
+          key: jq-cache-${{ github.run_id }}
+      - name: 結果ファイル
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screener-results
+          path: results/
