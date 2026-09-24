@@ -1,0 +1,4 @@
+jquants-api-client>=2.7.0
+pandas>=2.2
+requests
+tabulate
